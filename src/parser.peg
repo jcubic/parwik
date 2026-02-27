@@ -1,0 +1,184 @@
+// Wiki-like syntax parser using Peggy (PEG.js fork)
+// Supports: external links, internal links, headings, templates (nestable),
+//           XML-style tags (e.g. <ref>), bold ('''…'''), italic (''…'')
+
+{
+  function makeNode(type, attrs) {
+    return Object.assign({ type }, attrs);
+  }
+}
+
+// ── Top-level ────────────────────────────────────────────────────────────────
+
+Document
+  = nodes:Block* { return nodes; }
+
+Block
+  = Heading
+  / Inline
+
+// -- Headings ----------------------------------------------------------------
+// = h1 =  == h2 ==  === h3 ===  up to ====== h6 ======
+// Single rule: capture opening marker, derive level from its length,
+// verify the closing marker is identical using a semantic predicate.
+
+Heading
+  = marker:$("=" "="*) &{ return marker.length <= 6; }
+    _ content:$([^\n=] [^\n]*) _
+    close:$("=" "="*) LineEnd
+    &{ return marker.length === close.length; }
+  { return makeNode("heading", { level: marker.length, content: content.trim() }); }
+
+LineEnd = "\n" / !.
+
+// ── Inline nodes  ============================================================
+// Order matters: longer / more specific tokens must come first.
+
+Inline
+  = Bold
+  / Italic
+  / XmlTag
+  / Template
+  / InternalLink
+  / ExternalLink
+  / Text
+
+// ── Bold  '''text'''  ────────────────────────────────────────────────────────
+
+Bold
+  = "'''" children:BoldContent+ "'''"
+  { return makeNode("bold", { children }); }
+
+BoldContent
+  = !("'''") node:Inline { return node; }
+
+// ── Italic  ''text''  ────────────────────────────────────────────────────────
+// NOTE: must be tested AFTER bold so that ''' is not consumed as '' + leftover '
+
+Italic
+  = "''" children:ItalicContent+ "''"
+  { return makeNode("italic", { children }); }
+
+ItalicContent
+  = !("''") node:Inline { return node; }
+
+// ── XML tag  <tagName attrs>…</tagName>  or self-closing <tagName attrs/> ────
+
+XmlTag
+  = XmlSelfClosing
+  / XmlElement
+
+XmlSelfClosing
+  = "<" name:TagName attrs:XmlAttrs _ "/>"
+  { return makeNode("xml_tag", { name, attrs, selfClosing: true, children: [] }); }
+
+XmlElement
+  = "<" name:TagName attrs:XmlAttrs _ ">" children:XmlContent* "</" closeName:TagName ">"
+  &{ return name === closeName; }
+  { return makeNode("xml_tag", { name, attrs, selfClosing: false, children }); }
+
+// Inside an XML element the full Inline set is allowed (templates, links, etc.)
+XmlContent
+  = Bold
+  / Italic
+  / XmlTag
+  / Template
+  / InternalLink
+  / ExternalLink
+  / XmlText
+
+// Plain text inside XML – stops at '<' to avoid eating closing tags.
+XmlText
+  = chars:$([^<]+) { return makeNode("text", { value: chars }); }
+
+TagName
+  = $([a-zA-Z][a-zA-Z0-9_:-]*)
+
+// Attribute list – key="value" or key='value' pairs, whitespace-separated.
+XmlAttrs
+  = _ attrs:XmlAttr* { return attrs; }
+
+XmlAttr
+  = _ key:$([a-zA-Z_:][a-zA-Z0-9_:.-]*) _ "=" _ value:AttrValue _
+  { return { key, value }; }
+
+AttrValue
+  = '"' v:$([^"]*) '"' { return v; }
+  / "'" v:$([^']*) "'" { return v; }
+
+// ── External link  [URL description] ─────────────────────────────────────────
+
+ExternalLink
+  = "[" url:URL " " desc:LinkDescription "]"
+  { return makeNode("external_link", { url, description: desc }); }
+
+URL
+  = scheme:$([a-zA-Z]+) "://" rest:$([^\] ]+)
+  { return scheme + "://" + rest; }
+
+LinkDescription
+  = chars:$([^\]]+) { return chars.trim(); }
+
+// ── Internal link  [[Title]]  [[Title|label]]  [[Title]]suffix ───────────────
+
+InternalLink
+  = "[[" title:WikiTitle label:InternalLinkLabel? "]]" suffix:$([a-zA-Z]*)
+  { return makeNode("internal_link", { title, label: label || null, suffix }); }
+
+WikiTitle
+  = $([^\]|]+)
+
+InternalLinkLabel
+  = "|" label:$([^\]]+) { return label; }
+
+// ── Template  {{Name}}  {{Name|value}}  {{Name|param=value}}  ────────────────
+// Parameter values may themselves contain nested templates.
+
+Template
+  = "{{" _ name:TemplateName _ params:TemplateParams? "}}"
+  { return makeNode("template", { name: name.trim(), params: params || [] }); }
+
+TemplateName
+  = $([^|}{]+)
+
+TemplateParams
+  = "|" first:TemplateParam rest:("|" TemplateParam)*
+  { return [first, ...rest.map(r => r[1])]; }
+
+TemplateParam
+  = key:ParamKey "=" value:TemplateParamValue
+  { return makeNode("named_param", { key: key.trim(), value }); }
+  / value:TemplateParamValue
+  { return makeNode("positional_param", { value }); }
+
+ParamKey = $([^=|}{]+)
+
+// A parameter value is a mix of nested templates and plain text,
+// stopping at '|' or '}}' without consuming them.
+TemplateParamValue
+  = parts:(Template / TemplateRawText)*
+  { return parts; }
+
+TemplateRawText
+  = chars:$([^|}{]+)
+  { return makeNode("text", { value: chars }); }
+
+// ── Plain text  ──────────────────────────────────────────────────────────────
+
+Text
+  = chars:TextChar+ { return makeNode("text", { value: chars.join("") }); }
+
+TextChar
+  = !(
+      "'''"   // bold (must precede italic check)
+    / "''"    // italic
+    / "<"     // xml tag
+    / "[["    // internal link
+    / "["     // external link
+    / "{{"    // template
+    / "=="    // heading
+  ) char:. { return char; }
+
+// ── Helpers  ─────────────────────────────────────────────────────────────────
+
+_ "whitespace" = [ \t]*
