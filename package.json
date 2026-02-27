@@ -6,7 +6,12 @@
   "scripts": {
     "build": "peggy -o parser.js ./src/grammar.peg"
   },
-  "keywords": [],
+  "keywords": ["parser", "wikipedia", "wiki"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jcubic/parwik.git"
+  },
+  "homepage": "https://github.com/jcubic/parwik#readme",
   "author": "Jakub T. Jankiewicz <jcubic@onet.pl> (https://jakub.jankiewicz.org/)",
   "license": "MIT",
   "devDependencies": {
