@@ -23,11 +23,19 @@ Block
 // verify the closing marker is identical using a semantic predicate.
 
 Heading
-  = marker:$("=" "="*) &{ return marker.length <= 6; }
-    _ content:$([^\n=] [^\n]*) _
-    close:$("=" "="*) LineEnd
-    &{ return marker.length === close.length; }
-  { return makeNode("heading", { level: marker.length, content: content.trim() }); }
+  = marker:$("=" "="*) &{ return marker.length >= 1 && marker.length <= 6; }
+    rest:$([^\n]+) LineEnd
+    &{
+      // rest must end with the same number of '=' as marker, optionally preceded by spaces
+      const re = new RegExp("\\s*" + "=".repeat(marker.length) + "\\s*$");
+      return re.test(rest);
+    }
+  {
+    const level = marker.length;
+    const re = new RegExp("^\\s*(.*?)\\s*" + "=".repeat(level) + "\\s*$");
+    const content = rest.replace(re, "$1").trim();
+    return makeNode("heading", { level, content });
+  }
 
 LineEnd = "\n" / !.
 
