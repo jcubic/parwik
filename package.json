@@ -1,0 +1,12 @@
+{
+  "name": "parwik",
+  "version": "0.1.0",
+  "description": "Simple Wiki parser",
+  "main": "index.js",
+  "scripts": {
+  },
+  "keywords": [],
+  "author": "Jakub T. Jankiewicz <jcubic@onet.pl> (https://jakub.jankiewicz.org/)",
+  "license": "MIT",
+  "type": "module"
+}
