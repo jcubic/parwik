@@ -25,7 +25,8 @@ This is some [[Source Code]], which demostrates parwik library<ref>[https://gith
 
 ## Support
 
-🚀 Need [professional help with Wikipedia integration or staff training](https://jcubic.pl/wikipedia/)? Check out my Wikipedia Services.
+🚀 Need [professional help with Wikipedia integration or staff training](https://jcubic.pl/wikipedia/)?
+Check out my Wikipedia Services.
 
 ## License
 Coprygith (C) 2026 [Jakub T. Jnakiewicz](https://jakub.jankiewicz.org/)<br/>
