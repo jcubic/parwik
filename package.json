@@ -4,9 +4,12 @@
   "description": "Simple Wiki parser",
   "main": "index.js",
   "scripts": {
+    "build": "peggy -o parser.js ./src/grammar.peg"
   },
   "keywords": [],
   "author": "Jakub T. Jankiewicz <jcubic@onet.pl> (https://jakub.jankiewicz.org/)",
   "license": "MIT",
-  "type": "module"
+  "devDependencies": {
+    "peggy": "^5.0.6"
+  }
 }
